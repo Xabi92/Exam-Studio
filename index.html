@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Exam Studio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1D4ED8">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content / تخطّي إلى المحتوى</a>
+<div id="app"></div>
+<noscript>Exam Studio needs JavaScript. / يحتاج التطبيق إلى جافاسكربت.</noscript>
+<script src="js/core.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/db.js"></script>
+<script src="js/app.js"></script>
+<script>if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register("sw.js").catch(function(){});</script>
+</body>
+</html>
