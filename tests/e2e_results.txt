@@ -1,0 +1,70 @@
+PASS  page loads without JS errors
+PASS  UI defaults to Arabic RTL
+PASS  language toggle -> English LTR
+PASS  empty-state message shown with no banks
+PASS  sample bank imports 86 cards
+PASS  sample bank starts with 0 approved
+PASS  Q56 shows Unreadable status and block reason
+PASS  Q56 original source wording kept (no guessing)
+PASS  original shown for Arabic Q71 with dir=auto
+PASS  English stem renders LTR / Arabic stem RTL
+PASS  student: 0 questions available before approval; Start disabled
+PASS  cannot approve unreadable Q56
+PASS  cannot approve Needs Review Q5
+PASS  cannot approve independently-solved Q2 for FORMAL test
+PASS  8 questions approved for practice
+PASS  approved-but-independent shows hidden-from-students notice
+PASS  student still sees 0: independently solved is off by default
+PASS  after teacher enables it, student sees exactly the 8 approved
+PASS  formal mode: 0 available (needs verified source)
+PASS  Q shows progress, full stem and 4 options together
+PASS  answers not revealed before checking (no 'Correct answer' tag, no explanation)
+PASS  Check answer disabled until an option is chosen
+PASS  Q1: correct choice -> 'Correct' status after shuffle
+PASS  correct panel contrast >= 4.5
+PASS  Q2: wrong choice -> Incorrect + correct answer + explanation + verification
+PASS  incorrect panel contrast >= 4.5
+PASS  explanation panel contrast >= 4.5
+PASS  explanation font >= 16px, line-height >= 1.5
+PASS  Next button is prominent (>=44px high)
+PASS  stem 19-22px / options >=17px
+PASS  Q3: correct choice -> 'Correct' status after shuffle
+PASS  double-click Next advances exactly one question
+PASS  Q4: wrong choice -> Incorrect + correct answer + explanation + verification
+PASS  Q5: correct choice -> 'Correct' status after shuffle
+PASS  Q6: wrong choice -> Incorrect + correct answer + explanation + verification
+PASS  Q7: correct choice -> 'Correct' status after shuffle
+PASS  Q8: wrong choice -> Incorrect + correct answer + explanation + verification
+PASS  all 8 questions were distinct (no repeats)
+PASS  summary shows score and accuracy
+PASS  summary lists mistakes with explanations
+PASS  retry mistakes starts a quiz of exactly the missed questions
+PASS  PDF selection: honest 'cannot read' notice + AI prompt available, nothing added
+PASS  preview: 3 questions found; empty-stem Q2 flagged blocked
+PASS  new bank created and items are in review queue (3 cards)
+PASS  claimed 'verified_supplied' without evidence was downgraded to Needs Review
+PASS  HTML in source text rendered as text; no script executed
+PASS  Q2 (empty stem) blocked with reason, cannot be approved
+PASS  approval of empty-stem question is refused
+PASS  add-option adds a 5th option row
+PASS  remove-option removes it
+PASS  manual question saved with original preserved
+PASS  editing an approved question resets approval
+PASS  verified status without evidence is refused in editor
+PASS  mark ambiguous sets Ambiguous/Defective
+PASS  change log records approvals, edits, imports
+PASS  export JSON has format, bank, questions, IDs, explanations, statuses
+PASS  re-importing same file creates a NEW copy; nothing overwritten
+PASS  original bank still intact after duplicate import (86 questions)
+PASS  data persists after reload (IndexedDB)
+PASS  no horizontal overflow at 390px
+PASS  body text >= 16px
+PASS  dark mode emulation keeps light background
+PASS  keyboard focus lands on an interactive element
+PASS  focus outline defined (3px)
+PASS  manifest is served and valid JSON
+PASS  service worker registered and ready
+PASS  app loads fully OFFLINE after first visit (service worker)
+PASS  no uncaught JS errors during the whole run
+
+68 passed, 0 failed

@@ -1,0 +1,102 @@
+/* UI strings, Arabic and English. Question content is never translated here. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.ESI18n = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  var D = {
+    en: {
+      app: 'Exam Studio', workspace: 'Workspace', teacher: 'Teacher', student: 'Student', switch_lang: 'العربية', loading: 'Loading…',
+      error: 'Error', notice: 'Notice', none: 'None', sections: 'Sections',
+      tab_add: 'Add questions', add_manual: 'Add a question manually', add_option: 'Add option', remove_option: 'Remove last option',
+      add_title: 'Add questions to the review queue', add_intro: 'Everything you add lands in the review queue. Nothing is shown to students until you approve it.',
+      add_way1: 'Type or paste questions in the text format below (works directly, offline).', add_way2: 'Load a .txt / .md file in that format. For PDFs, scans, Word files and images, which this app cannot read, ask an AI assistant to convert the file into this text format using the prompt below, then load the result here.', add_way3: 'Load a bank .json file exported from Exam Studio.',
+      add_file: 'Choose a file (.txt, .md, .json, or a PDF/Word/image to get instructions)', ai_prompt_title: 'Prompt to give an AI assistant together with your PDF / image / Word file', ai_prompt_help: 'Copy this prompt, attach your file in an AI chat, then save the AI reply as a .txt file (or paste it below). The AI must not invent anything: unclear items are marked, and nothing counts as verified without evidence.', copy_prompt: 'Copy prompt', prompt_copied: 'Prompt copied. Paste it in an AI chat together with your file.',
+      add_text: 'Question text (Exam Studio text format)', add_source: 'Source file name (optional)', add_target: 'Add to', target_current: 'Current bank', target_new: 'A new bank', add_preview: 'Preview', add_empty: 'Nothing to add: paste text or load a file first.',
+      preview_result: 'Preview', questions_found: 'questions found', warnings: 'Warnings', add_commit_note: 'Questions with problems are still added, but stay blocked in the review queue with the reason shown.', add_commit: 'Add to review queue',
+      file_loaded: 'Loaded "{name}". Check the text, then press Preview.', json_routed: 'JSON bank file detected; importing it as a bank.', unreadable_file: '"{name}" cannot be read by this app (no PDF/Word/OCR engine is included). Use the prompt below with an AI assistant to convert it to text, then load the .txt result here. Nothing was added.',
+      no_target: 'Create or select a bank first.', in_queue: 'They are in the review queue.',
+      storage_title: 'Local storage only.', storage_warn: 'Banks live in this browser on this device. Clearing browser data or switching browser/device can erase them. Use "Export bank" regularly as your backup. There is no cloud sync, OCR or AI in this file.',
+      bank: 'Bank', no_banks: 'No banks yet', new_bank: 'New bank', import_new: 'Import file as new bank', import_append: 'Append file to this bank',
+      export_bank: 'Export bank (JSON)', export_student: 'Export student version', preview: 'Preview student view',
+      empty_teacher: 'No bank yet. Import a bank JSON file (for example data/sample_bank.json) or create a new bank.',
+      tab_queue: 'Review queue', tab_settings: 'Bank settings', tab_log: 'Change log', tab_imports: 'Imports',
+      sum_total: 'Total', sum_approved: 'Approved', sum_blocked: 'Blocked (incomplete)',
+      filter: 'Filter', showing: 'Showing {n} of {m}',
+      f_all: 'All', f_approved: 'Approved', f_needs_review: 'Awaiting review', f_hold: 'On hold', f_rejected: 'Rejected', f_blocked: 'Blocked (incomplete)', f_flagged: 'Flagged by students', f_dup: 'Possible duplicates',
+      v_verified_supplied: 'Verified — Supplied Source', v_verified_external: 'Verified — External Source', v_independently_solved_high: 'Independently Solved — High Confidence',
+      v_needs_review: 'Needs Review', v_ambiguous_defective: 'Ambiguous / Defective', v_unreadable_incomplete: 'Unreadable / Incomplete',
+      rv_draft: 'Draft', rv_needs_review: 'Awaiting review', rv_approved: 'Approved', rv_rejected: 'Rejected', rv_hold: 'On hold',
+      qno: 'Question', page: 'page', flagged: 'Flagged', dup: 'Possible duplicate (not merged)',
+      display_text: 'Display text', orig_stem: 'Original extracted text (read-only)', context: 'Passage / instruction', explanation: 'Explanation', ambiguity: 'Ambiguity notes', ocr: 'OCR / transcription notes',
+      basis: 'Basis of confidence (not a statistical measure)', evidence: 'Evidence', blocked_reason: 'Blocked from students', hidden_from_students: 'Approved but currently hidden from students',
+      proposed: 'Proposed answer', edit: 'Edit', approve_practice: 'Approve for practice', approve_formal: 'Approve for formal test', hold: 'Hold', mark_ambiguous: 'Mark ambiguous', reject: 'Reject',
+      edit_question: 'Edit question', original_kept: 'The original extracted wording is always kept. Edits go in the display text. Editing an approved question resets its approval.',
+      correct: 'Correct', option: 'Option', expl_en: 'Explanation (English)', expl_ar: 'Explanation (Arabic)', verification: 'Verification status',
+      ev_title: 'Source title', ev_url: 'URL or bibliographic details', ev_date: 'Date accessed', ev_supports: 'What it supports',
+      save: 'Save changes', cancel: 'Cancel', saved: 'Saved.', need_evidence: 'A Verified status needs an evidence entry (source title).', need_external_fields: 'External verification needs a URL/bibliographic detail and an access date.',
+      edit_reset: 'Saved. Because the content changed, approval was reset and the question is back in the review queue.',
+      cannot_approve: 'Cannot approve.', confirm_approve: 'Confirm: you have compared this question with the source page and checked the answer and explanation.', approved_ok: 'Approved.',
+      bank_name: 'Bank name', bank_name_prompt: 'Name for the new bank:', allow_ind: 'Allow "Independently Solved" questions in practice mode', allow_ind_help: 'Off by default. When on, students see the status label on each such question. Formal tests always require a verified source.',
+      study_mode: 'Study mode (students may reveal answers before submitting)', delete_bank: 'Delete this bank', confirm_delete: 'Delete the bank "{name}" and all its questions from this browser? Export a backup first.',
+      imported: 'Imported {n} questions.', bad_json: 'The file is not valid JSON.', nothing_to_publish: 'No approved questions are eligible for students yet.',
+      confirm_student_export: 'Export a student version with {n} approved questions? The file contains the answers and explanations. Keep your master bank private.',
+      no_banks_student: 'No quiz is available yet. Ask your teacher to publish one.', start_quiz: 'Start a quiz', mode: 'Mode', practice: 'Practice', formal: 'Formal test (verified questions only)',
+      available: 'Questions available in this mode: {n}', none_available: 'No questions are approved for this mode yet. In the Teacher workspace, review and approve questions first.',
+      count: 'Number of questions', feedback: 'Feedback', fb_immediate: 'After each question', fb_end: 'At the end', shuffle_q: 'Shuffle question order', shuffle_o: 'Shuffle answer choices', timer: 'Timer in minutes (0 = off)', start: 'Start',
+      time_left: 'Time left', progress: 'Question {i} of {n}', score: 'Score', check: 'Check answer', next: 'Next question', finish: 'Finish', flag: 'Flag this question', flag_thanks: 'Thank you. The teacher will see your flag.',
+      reveal: 'Show answer (study mode)', answer_revealed: 'Answer', correct_answer: 'Correct answer', your_answer: 'Your answer', incorrect: 'Incorrect', right: 'Correct',
+      summary: 'Quiz summary', accuracy: 'Accuracy', unanswered: 'Unanswered', accuracy_note: 'Accuracy = correct answers ÷ questions in this quiz.', review_mistakes: 'Review mistakes', retry_mistakes: 'Retry mistakes', new_quiz: 'New quiz'
+    },
+    ar: {
+      app: 'استوديو الاختبارات', workspace: 'مساحة العمل', teacher: 'المعلّم', student: 'الطالب', switch_lang: 'English', loading: 'جارٍ التحميل…',
+      error: 'خطأ', notice: 'تنبيه', none: 'لا يوجد', sections: 'الأقسام',
+      tab_add: 'إضافة أسئلة', add_manual: 'إضافة سؤال يدوياً', add_option: 'إضافة خيار', remove_option: 'حذف آخر خيار',
+      add_title: 'إضافة أسئلة إلى قائمة المراجعة', add_intro: 'كل ما تضيفه يذهب إلى قائمة المراجعة. لا يظهر شيء للطلاب حتى تعتمده.',
+      add_way1: 'اكتب أو الصق الأسئلة بصيغة النص أدناه (تعمل مباشرة ودون اتصال).', add_way2: 'حمّل ملف .txt / .md بتلك الصيغة. أما ملفات PDF والصور الممسوحة وWord التي لا يستطيع التطبيق قراءتها، فاطلب من مساعد ذكاء اصطناعي تحويلها إلى هذه الصيغة النصية باستخدام التعليمات أدناه، ثم حمّل الناتج هنا.', add_way3: 'حمّل ملف بنك .json مُصدَّراً من استوديو الاختبارات.',
+      add_file: 'اختر ملفاً (.txt أو .md أو .json، أو PDF/Word/صورة للحصول على الإرشادات)', ai_prompt_title: 'تعليمات تعطيها لمساعد الذكاء الاصطناعي مع ملف PDF / الصورة / Word', ai_prompt_help: 'انسخ هذه التعليمات وأرفق ملفك في محادثة مع مساعد ذكاء اصطناعي، ثم احفظ رده كملف .txt (أو الصقه أدناه). يجب ألا يخترع المساعد شيئاً: العناصر الغامضة تُعلَّم، ولا يُعدّ شيء موثّقاً دون دليل.', copy_prompt: 'نسخ التعليمات', prompt_copied: 'تم نسخ التعليمات. الصقها في محادثة مع مساعد ذكاء اصطناعي مع ملفك.',
+      add_text: 'نص الأسئلة (صيغة استوديو الاختبارات النصية)', add_source: 'اسم الملف المصدر (اختياري)', add_target: 'الإضافة إلى', target_current: 'البنك الحالي', target_new: 'بنك جديد', add_preview: 'معاينة', add_empty: 'لا شيء للإضافة: الصق نصاً أو حمّل ملفاً أولاً.',
+      preview_result: 'المعاينة', questions_found: 'سؤالاً تم العثور عليه', warnings: 'تحذيرات', add_commit_note: 'الأسئلة التي بها مشكلات تُضاف أيضاً لكنها تبقى محجوبة في قائمة المراجعة مع بيان السبب.', add_commit: 'إضافة إلى قائمة المراجعة',
+      file_loaded: 'تم تحميل «{name}». راجع النص ثم اضغط معاينة.', json_routed: 'تم اكتشاف ملف بنك JSON؛ يجري استيراده كبنك.', unreadable_file: 'لا يستطيع هذا التطبيق قراءة «{name}» (لا يتضمن محرك PDF/Word/OCR). استخدم التعليمات أدناه مع مساعد ذكاء اصطناعي لتحويله إلى نص، ثم حمّل ناتج .txt هنا. لم تُضف أي أسئلة.',
+      no_target: 'أنشئ بنكاً أو اختر واحداً أولاً.', in_queue: 'وهي الآن في قائمة المراجعة.',
+      storage_title: 'التخزين محلي فقط.', storage_warn: 'تُحفظ البنوك في هذا المتصفح وعلى هذا الجهاز. مسح بيانات المتصفح أو تغيير المتصفح/الجهاز قد يمحوها. استخدم «تصدير البنك» بانتظام كنسخة احتياطية. لا توجد مزامنة سحابية ولا OCR ولا ذكاء اصطناعي في هذا الملف.',
+      bank: 'البنك', no_banks: 'لا توجد بنوك بعد', new_bank: 'بنك جديد', import_new: 'استيراد ملف كبنك جديد', import_append: 'إلحاق ملف بهذا البنك',
+      export_bank: 'تصدير البنك (JSON)', export_student: 'تصدير نسخة الطالب', preview: 'معاينة واجهة الطالب',
+      empty_teacher: 'لا يوجد بنك بعد. استورد ملف JSON (مثل data/sample_bank.json) أو أنشئ بنكاً جديداً.',
+      tab_queue: 'قائمة المراجعة', tab_settings: 'إعدادات البنك', tab_log: 'سجل التغييرات', tab_imports: 'عمليات الاستيراد',
+      sum_total: 'المجموع', sum_approved: 'المعتمد', sum_blocked: 'المحجوب (ناقص)',
+      filter: 'تصفية', showing: 'عرض {n} من {m}',
+      f_all: 'الكل', f_approved: 'معتمد', f_needs_review: 'بانتظار المراجعة', f_hold: 'معلّق', f_rejected: 'مرفوض', f_blocked: 'محجوب (ناقص)', f_flagged: 'أبلغ عنه الطلاب', f_dup: 'تكرار محتمل',
+      v_verified_supplied: 'موثّق — مصدر مقدَّم', v_verified_external: 'موثّق — مصدر خارجي', v_independently_solved_high: 'محلول باستقلال — ثقة عالية',
+      v_needs_review: 'يحتاج مراجعة', v_ambiguous_defective: 'غامض / معيب', v_unreadable_incomplete: 'غير مقروء / ناقص',
+      rv_draft: 'مسودة', rv_needs_review: 'بانتظار المراجعة', rv_approved: 'معتمد', rv_rejected: 'مرفوض', rv_hold: 'معلّق',
+      qno: 'السؤال', page: 'صفحة', flagged: 'مُبلَّغ عنه', dup: 'تكرار محتمل (لم يُدمج)',
+      display_text: 'نص العرض', orig_stem: 'النص الأصلي المستخرج (للقراءة فقط)', context: 'نص/تعليمات مرافقة', explanation: 'الشرح', ambiguity: 'ملاحظات الغموض', ocr: 'ملاحظات OCR / النسخ',
+      basis: 'أساس الثقة (ليس مقياساً إحصائياً)', evidence: 'الدليل', blocked_reason: 'محجوب عن الطلاب', hidden_from_students: 'معتمد لكنه مخفي حالياً عن الطلاب',
+      proposed: 'الإجابة المقترحة', edit: 'تعديل', approve_practice: 'اعتماد للتدريب', approve_formal: 'اعتماد للاختبار الرسمي', hold: 'تعليق', mark_ambiguous: 'وسم كغامض', reject: 'رفض',
+      edit_question: 'تعديل السؤال', original_kept: 'يُحفظ النص الأصلي المستخرج دائماً. التعديلات تُكتب في نص العرض. تعديل سؤال معتمد يُلغي اعتماده.',
+      correct: 'الصحيح', option: 'الخيار', expl_en: 'الشرح (إنجليزي)', expl_ar: 'الشرح (عربي)', verification: 'حالة التوثيق',
+      ev_title: 'عنوان المصدر', ev_url: 'الرابط أو بيانات المرجع', ev_date: 'تاريخ الاطلاع', ev_supports: 'ما الذي يدعمه المصدر',
+      save: 'حفظ التغييرات', cancel: 'إلغاء', saved: 'تم الحفظ.', need_evidence: 'حالة «موثّق» تتطلب إدخال دليل (عنوان المصدر).', need_external_fields: 'التوثيق الخارجي يتطلب رابطاً/بيانات مرجع وتاريخ اطلاع.',
+      edit_reset: 'تم الحفظ. لأن المحتوى تغيّر أُلغي الاعتماد وعاد السؤال إلى قائمة المراجعة.',
+      cannot_approve: 'تعذّر الاعتماد.', confirm_approve: 'تأكيد: قارنتَ هذا السؤال بصفحة المصدر وراجعتَ الإجابة والشرح.', approved_ok: 'تم الاعتماد.',
+      bank_name: 'اسم البنك', bank_name_prompt: 'اسم البنك الجديد:', allow_ind: 'السماح بأسئلة «المحلولة باستقلال» في وضع التدريب', allow_ind_help: 'مُعطَّل افتراضياً. عند تفعيله يرى الطالب وسم الحالة على كل سؤال من هذا النوع. الاختبار الرسمي يتطلب دائماً مصدراً موثّقاً.',
+      study_mode: 'وضع الدراسة (يمكن للطالب إظهار الإجابة قبل التسليم)', delete_bank: 'حذف هذا البنك', confirm_delete: 'حذف البنك «{name}» وكل أسئلته من هذا المتصفح؟ صدّر نسخة احتياطية أولاً.',
+      imported: 'تم استيراد {n} سؤالاً.', bad_json: 'الملف ليس JSON صالحاً.', nothing_to_publish: 'لا توجد أسئلة معتمدة مؤهلة للطلاب بعد.',
+      confirm_student_export: 'تصدير نسخة الطالب بـ {n} سؤالاً معتمداً؟ الملف يحتوي الإجابات والشروح. أبقِ البنك الرئيسي خاصاً.',
+      no_banks_student: 'لا يوجد اختبار متاح بعد. اطلب من معلمك نشر اختبار.', start_quiz: 'ابدأ اختباراً', mode: 'الوضع', practice: 'تدريب', formal: 'اختبار رسمي (أسئلة موثّقة فقط)',
+      available: 'عدد الأسئلة المتاحة في هذا الوضع: {n}', none_available: 'لا توجد أسئلة معتمدة لهذا الوضع بعد. في مساحة المعلّم، راجع الأسئلة واعتمدها أولاً.',
+      count: 'عدد الأسئلة', feedback: 'التغذية الراجعة', fb_immediate: 'بعد كل سؤال', fb_end: 'في النهاية', shuffle_q: 'خلط ترتيب الأسئلة', shuffle_o: 'خلط ترتيب الخيارات', timer: 'المؤقّت بالدقائق (0 = بدون)', start: 'ابدأ',
+      time_left: 'الوقت المتبقي', progress: 'السؤال {i} من {n}', score: 'النتيجة', check: 'تحقق من الإجابة', next: 'السؤال التالي', finish: 'إنهاء', flag: 'الإبلاغ عن هذا السؤال', flag_thanks: 'شكراً. سيرى المعلم بلاغك.',
+      reveal: 'إظهار الإجابة (وضع الدراسة)', answer_revealed: 'الإجابة', correct_answer: 'الإجابة الصحيحة', your_answer: 'إجابتك', incorrect: 'غير صحيحة', right: 'إجابة صحيحة',
+      summary: 'ملخص الاختبار', accuracy: 'الدقة', unanswered: 'بلا إجابة', accuracy_note: 'الدقة = الإجابات الصحيحة ÷ عدد أسئلة هذا الاختبار.', review_mistakes: 'مراجعة الأخطاء', retry_mistakes: 'إعادة الأخطاء', new_quiz: 'اختبار جديد'
+    }
+  };
+  // 'correct' means the label "Correct" in both the edit form and the result panel
+  function t(lang, key, vars) {
+    var s = (D[lang] && D[lang][key] !== undefined) ? D[lang][key] : (D.en[key] !== undefined ? D.en[key] : key);
+    if (vars) Object.keys(vars).forEach(function (k) { s = s.split('{' + k + '}').join(vars[k]); });
+    return s;
+  }
+  return { D: D, t: t };
+});
