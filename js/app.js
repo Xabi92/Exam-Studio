@@ -59,7 +59,7 @@
   function msgHtml() {
     if (!S.msg) return '';
     var m = S.msg; S.msg = null;
-    return '<div class="panel ' + (m.type === 'error' ? 'bad' : m.type === 'warn' ? 'warn' : 'info') + '" role="status"><strong>' + esc(m.type === 'error' ? t('error') : t('notice')) + ':</strong> ' + esc(m.text) + '</div>';
+    return '<div class="toast panel ' + (m.type === 'error' ? 'bad' : m.type === 'warn' ? 'warn' : 'good') + '" role="status" aria-live="polite"><strong>' + esc(m.type === 'error' ? t('error') : t('notice')) + ':</strong> ' + esc(m.text) + '</div>';
   }
 
   /* ---------- top bar ---------- */
@@ -107,11 +107,9 @@
     return h + '</div>';
   }
 
-  function queueView() {
-    var qs = bankQs();
-    if (S.editingId) return editView(S.draft);
+  function shownQuestions(qs) {
     var f = S.filter;
-    var shown = qs.filter(function (q) {
+    return qs.filter(function (q) {
       if (f === 'all') return true;
       if (f === 'blocked') return C.validateQuestion(q).length > 0;
       if (f === 'flagged') return !!q.flagged;
@@ -119,8 +117,15 @@
       if (C.VERIFICATION[f]) return q.verification_status === f;
       return q.review_status === f;
     });
+  }
+
+  function queueView() {
+    var qs = bankQs();
+    if (S.editingId) return editView(S.draft);
+    var shown = shownQuestions(qs);
+    var f = S.filter;
     var opts = ['all', 'approved', 'needs_review', 'hold', 'rejected', 'blocked', 'flagged', 'dup'].concat(Object.keys(C.VERIFICATION));
-    var h = summaryHtml(qs) + '<div class="btns"><button class="btn primary" data-action="add-manual">+ ' + esc(t('add_manual')) + '</button></div><div class="row"><label class="grow">' + esc(t('filter')) + '<select data-change="filter">' + opts.map(function (o) {
+    var h = summaryHtml(qs) + '<div class="btns"><button class="btn primary" data-action="add-manual">+ ' + esc(t('add_manual')) + '</button><button class="btn primary" data-action="approve-all">' + esc(t('approve_all')) + '</button></div><div class="row"><label class="grow">' + esc(t('filter')) + '<select data-change="filter">' + opts.map(function (o) {
       var label = C.VERIFICATION[o] ? vlabel(o) : t('f_' + o);
       return '<option value="' + o + '"' + (o === f ? ' selected' : '') + '>' + esc(label) + '</option>';
     }).join('') + '</select></label></div>';
@@ -223,7 +228,10 @@
       '<label>' + esc(t('bank')) + '<select data-change="bank">' + S.banks.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === S.bankId ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') + '</select></label>' +
       '<label>' + esc(t('mode')) + '<select id="q_mode" data-change="qs-mode"><option value="practice"' + (su.mode === 'practice' ? ' selected' : '') + '>' + esc(t('practice')) + '</option><option value="formal"' + (su.mode === 'formal' ? ' selected' : '') + '>' + esc(t('formal')) + '</option></select></label>' +
       '<p class="panel info small">' + esc(t('available', { n: el.length })) + '</p>';
-    if (!el.length) h += '<div class="panel warn">' + esc(t('none_available')) + '</div>';
+    if (!el.length) {
+      var apr = bankQs().filter(function (q) { return q.review_status === 'approved'; }).length;
+      h += '<div class="panel warn">' + esc(apr ? t('approved_but_hidden', { n: apr }) : t('none_available')) + '</div>';
+    }
     h += '<label>' + esc(t('count')) + '<input type="number" id="q_count" min="1" max="500" value="' + esc(su.count) + '"></label>' +
       '<label>' + esc(t('feedback')) + '<select id="q_fb"><option value="immediate"' + (su.feedback === 'immediate' ? ' selected' : '') + '>' + esc(t('fb_immediate')) + '</option><option value="end"' + (su.feedback === 'end' ? ' selected' : '') + '>' + esc(t('fb_end')) + '</option></select></label>' +
       '<label class="inl"><input type="checkbox" id="q_sq"' + (su.shuffleQ ? ' checked' : '') + '> ' + esc(t('shuffle_q')) + '</label>' +
@@ -358,8 +366,10 @@
     var body;
     if (S.loading) body = '<p class="card">' + esc(t('loading')) + '</p>';
     else if (S.error) body = '<div class="panel bad">' + esc(S.error) + '</div>';
-    else body = msgHtml() + (S.ws === 'teacher' ? teacherView() : studentView());
-    $app.innerHTML = topbar() + '<main id="main">' + body + '</main>';
+    else body = (S.ws === 'teacher' ? teacherView() : studentView());
+    var toast = S.loading ? '' : msgHtml();
+    $app.innerHTML = topbar() + '<main id="main">' + body + '</main>' + toast;
+    if (toast) setTimeout(function () { var el = document.querySelector('.toast'); if (el) el.remove(); }, 12000);
     if (S.quiz && !S.quiz.done && S.quiz.deadline) { var el = document.getElementById('timer'); if (el) { var left = Math.max(0, S.quiz.deadline - Date.now()); el.textContent = Math.floor(left / 60000) + ':' + ('0' + Math.floor(left % 60000 / 1000)).slice(-2); } }
   }
   function renderKeepScroll() { var y = window.scrollY; render(); window.scrollTo(0, y); }
@@ -395,15 +405,13 @@
 
   function approve(q, kind) {
     var chk = C.canApprove(q, kind, bank().settings);
-    if (!chk.ok) { flash('error', t('cannot_approve') + ' ' + chk.blocking.join(' ')); return render(); }
-    var msg = t('confirm_approve');
-    if (!window.confirm(msg)) return;
+    if (!chk.ok) { flash('error', t('cannot_approve') + ' Q' + q.source_question_number + ': ' + chk.blocking.join(' ')); return renderKeepScroll(); }
     q.review_status = 'approved'; q.approved_for_practice = true;
     if (kind === 'formal') q.approved_for_formal_test = true;
     q.reviewer_decision = 'approved_' + kind; q.reviewer_date = now();
     saveQ(q).then(function () { return addLog('approve_' + kind, q.id, ''); }).then(function () {
       var adv = chk.reasons.filter(function (x) { return x.indexOf('Note:') === 0; });
-      flash(adv.length ? 'warn' : 'ok', adv.length ? adv.join(' ') : t('approved_ok')); render();
+      flash(adv.length ? 'warn' : 'ok', adv.length ? t('approved_ok') + ' ' + t('hidden_until_allowed') : t('approved_ok')); renderKeepScroll();
     });
   }
 
@@ -423,6 +431,23 @@
     if (g('f_amb')) q.ambiguity_notes = g('f_amb').value;
     if (g('f_ocr')) q.ocr_notes = g('f_ocr').value;
   }
+  function approveAll() {
+    var b = bank(), list = shownQuestions(bankQs());
+    var ok = list.filter(function (q) { return q.review_status !== 'approved' && C.canApprove(q, 'practice', b.settings).ok; });
+    var skipped = list.filter(function (q) { return q.review_status !== 'approved' && !C.canApprove(q, 'practice', b.settings).ok; });
+    if (!ok.length) { flash('warn', t('nothing_to_approve', { m: skipped.length })); return renderKeepScroll(); }
+    if (!window.confirm(t('confirm_approve_all', { n: ok.length, m: skipped.length }))) return;
+    var needInd = ok.some(function (q) { return q.verification_status === 'independently_solved_high'; }) && !(b.settings && b.settings.allowIndependentInPractice);
+    var enable = needInd && window.confirm(t('confirm_enable_ind'));
+    var ts = now();
+    ok.forEach(function (q) { q.review_status = 'approved'; q.approved_for_practice = true; q.reviewer_decision = 'approved_practice'; q.reviewer_date = ts; q.updated_at = ts; });
+    var ops = [DB.putMany('questions', ok)];
+    if (enable) { b.settings = Object.assign({}, b.settings, { allowIndependentInPractice: true }); ops.push(DB.put('banks', b)); }
+    Promise.all(ops).then(function () { return addLog('approve_all_practice', null, ok.length + ' approved' + (enable ? '; independently solved allowed in practice' : '')); }).then(function () {
+      flash(needInd && !enable ? 'warn' : 'ok', t('approved_n', { n: ok.length, m: skipped.length }) + (needInd && !enable ? ' ' + t('hidden_until_allowed') : '')); renderKeepScroll();
+    });
+  }
+
   function saveEdit(id) {
     var q = qById(id), d = S.draft;
     var snap = function (x) { return JSON.stringify([x.stem_display, x.context, x.options, x.correct_option_ids, x.explanation_en, x.explanation_ar, x.verification_status]); };
@@ -603,6 +628,7 @@
     if (act === 'cancel-edit') return cancelEdit();
     if (act === 'save-edit') return saveEdit(id);
     if (act === 'add-manual') return addManual();
+    if (act === 'approve-all') return approveAll();
     if (act === 'add-option' || act === 'remove-option') {
       applyForm(S.draft);
       if (act === 'add-option') { var L = 'ABCDEFGHIJ'; if (S.draft.options.length < 10) { var nl = L[S.draft.options.length]; S.draft.options.push({ id: nl, label: nl, text: '' }); } }

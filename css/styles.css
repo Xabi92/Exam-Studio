@@ -71,3 +71,5 @@ fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; 
 .log { padding-inline-start: 18px; } .log li { margin: 6px 0; }
 @media (min-width: 700px) { body { font-size: 17px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+.toast { position: fixed; inset-inline: 12px; bottom: 12px; z-index: 50; max-width: 796px; margin: 0 auto; font-size: 17px; box-shadow: 0 2px 8px rgba(23,32,51,.25); }
