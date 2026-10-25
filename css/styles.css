@@ -73,3 +73,6 @@ fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 .toast { position: fixed; inset-inline: 12px; bottom: 12px; z-index: 50; max-width: 796px; margin: 0 auto; font-size: 17px; box-shadow: 0 2px 8px rgba(23,32,51,.25); }
+
+.wlabel { margin-top: 14px; }
+.wans { font-size: 18px; line-height: 1.5; min-height: 96px; border-width: 2px; }

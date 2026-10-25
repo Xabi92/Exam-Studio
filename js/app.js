@@ -18,7 +18,9 @@
   function t(k, v) { return I.t(S.lang, k, v); }
   function esc(x) { return String(x === undefined || x === null ? '' : x).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function bank() { return S.banks.filter(function (b) { return b.id === S.bankId; })[0] || null; }
-  function bankQs() { return S.questions.filter(function (q) { return q.bank_id === S.bankId; }).sort(function (a, b) { return a.id < b.id ? -1 : 1; }); }
+  function qOrder(q) { return typeof q.order === 'number' ? q.order : 1e9; }
+  function maxOrder(bankId) { var m = 0; S.questions.forEach(function (q) { if (q.bank_id === bankId && typeof q.order === 'number') m = Math.max(m, q.order); }); return m; }
+  function bankQs() { return S.questions.filter(function (q) { return q.bank_id === S.bankId; }).sort(function (a, b) { return (qOrder(a) - qOrder(b)) || (a.id < b.id ? -1 : 1); }); }
   function qById(id) { return S.questions.filter(function (q) { return q.id === id; })[0]; }
   function now() { return new Date().toISOString(); }
   function vlabel(st) { return t('v_' + st); }
@@ -125,7 +127,7 @@
     var shown = shownQuestions(qs);
     var f = S.filter;
     var opts = ['all', 'approved', 'needs_review', 'hold', 'rejected', 'blocked', 'flagged', 'dup'].concat(Object.keys(C.VERIFICATION));
-    var h = summaryHtml(qs) + '<div class="btns"><button class="btn primary" data-action="add-manual">+ ' + esc(t('add_manual')) + '</button><button class="btn primary" data-action="approve-all">' + esc(t('approve_all')) + '</button></div><div class="row"><label class="grow">' + esc(t('filter')) + '<select data-change="filter">' + opts.map(function (o) {
+    var h = summaryHtml(qs) + '<div class="btns"><button class="btn primary" data-action="add-manual" data-v="mc">+ ' + esc(t('add_manual_mc')) + '</button><button class="btn primary" data-action="add-manual" data-v="sa">+ ' + esc(t('add_manual_sa')) + '</button><button class="btn primary" data-action="approve-all">' + esc(t('approve_all')) + '</button></div><div class="row"><label class="grow">' + esc(t('filter')) + '<select data-change="filter">' + opts.map(function (o) {
       var label = C.VERIFICATION[o] ? vlabel(o) : t('f_' + o);
       return '<option value="' + o + '"' + (o === f ? ' selected' : '') + '>' + esc(label) + '</option>';
     }).join('') + '</select></label></div>';
@@ -145,7 +147,8 @@
     h += '<div class="stem" dir="auto">' + esc(q.stem_original) + '</div>';
     if (q.stem_display && q.stem_display !== q.stem_original) h += '<div class="panel info small"><strong>' + esc(t('display_text')) + ':</strong> <span dir="auto">' + esc(q.stem_display) + '</span></div>';
     if (q.context) h += '<div class="ctx" dir="auto">' + esc(q.context) + '</div>';
-    h += optionsHtml(q, true);
+    if (isWritten(q)) h += '<div class="panel info small"><strong>' + esc(t('accepted_answers')) + ' (' + esc(t(q.grading === 'self' ? 'grading_self' : 'grading_auto')) + '):</strong><ul>' + (q.accepted_answers || []).map(function (x) { return '<li dir="auto">' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+    else h += optionsHtml(q, true);
     var ex = expFor(q);
     h += '<div class="panel expl"><strong>' + esc(t('explanation')) + ':</strong> <span dir="auto">' + esc(ex || t('none')) + '</span></div>';
     if (q.ambiguity_notes) h += '<div class="panel warn small"><strong>' + esc(t('ambiguity')) + ':</strong> <span dir="auto">' + esc(q.ambiguity_notes) + '</span></div>';
@@ -173,12 +176,17 @@
       (q.stem_original ? '<label>' + esc(t('orig_stem')) + '<textarea readonly dir="auto" rows="3">' + esc(q.stem_original) + '</textarea></label>' : '') +
       '<label>' + esc(t('display_text')) + '<textarea id="f_stem" dir="auto" rows="3">' + esc(q.stem_display) + '</textarea></label>' +
       '<label>' + esc(t('context')) + '<textarea id="f_ctx" dir="auto" rows="2">' + esc(q.context) + '</textarea></label>';
-    q.options.forEach(function (o, i) {
+    if (q._new) h += '<label>' + esc(t('qtype')) + '<select id="f_type" data-change="qtype"><option value="single_choice"' + (q.question_type !== 'short_answer' ? ' selected' : '') + '>' + esc(t('type_mc')) + '</option><option value="short_answer"' + (q.question_type === 'short_answer' ? ' selected' : '') + '>' + esc(t('type_sa')) + '</option></select></label>';
+    if (isWritten(q)) {
+      h += '<label>' + esc(t('accepted_label')) + '<textarea id="f_acc" dir="auto" rows="3">' + esc((q.accepted_answers || []).join('\n')) + '</textarea></label><p class="muted small">' + esc(t('accepted_help')) + '</p>' +
+        '<label>' + esc(t('grading')) + '<select id="f_grading"><option value="auto"' + (q.grading !== 'self' ? ' selected' : '') + '>' + esc(t('grading_auto_long')) + '</option><option value="self"' + (q.grading === 'self' ? ' selected' : '') + '>' + esc(t('grading_self_long')) + '</option></select></label>';
+    }
+    (isWritten(q) ? [] : q.options).forEach(function (o, i) {
       var chk = (q.correct_option_ids || []).indexOf(o.id) >= 0;
       h += '<div class="optedit"><label class="inl"><input type="' + (q.question_type === 'multiple_select' ? 'checkbox' : 'radio') + '" name="f_correct" value="' + esc(o.id) + '"' + (chk ? ' checked' : '') + '> ' + esc(t('correct')) + ' ' + esc(o.label) + '</label>' +
         '<input type="text" dir="auto" id="f_opt_' + i + '" value="' + esc(o.text) + '" aria-label="' + esc(t('option')) + ' ' + esc(o.label) + '"></div>';
     });
-    h += '<div class="btns"><button class="btn" data-action="add-option">+ ' + esc(t('add_option')) + '</button>' + (q.options.length > 2 ? '<button class="btn" data-action="remove-option">− ' + esc(t('remove_option')) + '</button>' : '') + '</div>';
+    if (!isWritten(q)) h += '<div class="btns"><button class="btn" data-action="add-option">+ ' + esc(t('add_option')) + '</button>' + (q.options.length > 2 ? '<button class="btn" data-action="remove-option">− ' + esc(t('remove_option')) + '</button>' : '') + '</div>';
     h += '<label>' + esc(t('expl_en')) + '<textarea id="f_en" dir="ltr" rows="3">' + esc(q.explanation_en) + '</textarea></label>' +
       '<label>' + esc(t('expl_ar')) + '<textarea id="f_ar" dir="rtl" rows="3">' + esc(q.explanation_ar) + '</textarea></label>' +
       '<label>' + esc(t('verification')) + '<select id="f_vs">' + Object.keys(C.VERIFICATION).map(function (k) { return '<option value="' + k + '"' + (q.verification_status === k ? ' selected' : '') + '>' + esc(vlabel(k)) + '</option>'; }).join('') + '</select></label>' +
@@ -274,66 +282,92 @@
   }
   function finishQuiz() { if (S.quiz) { S.quiz.done = true; clearInterval(timerHandle); } }
 
+  function isWritten(q) { return q.question_type === 'short_answer'; }
+  function isImm(qz, q) { return qz.setup.feedback === 'immediate' || (isWritten(q) && q.grading === 'self'); }
+
   function quizView() {
     var qz = S.quiz, it = qz.items[qz.idx], q = it.question, a = qz.answers[q.id] || {};
-    var immediate = qz.setup.feedback === 'immediate';
+    var fbImm = qz.setup.feedback === 'immediate';
+    var immediate = isImm(qz, q), written = isWritten(q);
     var multi = q.question_type === 'multiple_select';
     var h = '<section class="card quiz"><div class="qtop"><h2 class="qtitle" dir="auto">' + esc(qz.title) + '</h2>' +
       (qz.deadline ? '<span class="timer" aria-label="' + esc(t('time_left')) + '">⏱ <span id="timer"></span></span>' : '') + '</div>' +
       '<div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="' + qz.items.length + '" aria-valuenow="' + (qz.idx + 1) + '"><div class="bar" style="width:' + Math.round((qz.idx + (a.checked ? 1 : 0)) / qz.items.length * 100) + '%"></div></div>' +
-      '<p class="prog">' + esc(t('progress', { i: qz.idx + 1, n: qz.items.length })) + (immediate ? ' · ' + esc(t('score')) + ': ' + scoreNow() : '') + '</p>' +
+      '<p class="prog">' + esc(t('progress', { i: qz.idx + 1, n: qz.items.length })) + (fbImm ? ' · ' + esc(t('score')) + ': ' + scoreNow() : '') + '</p>' +
       '<p class="muted small">' + esc(t('qno')) + ' ' + esc(q.source_question_number) + (q.category ? ' · ' + esc(q.category) : '') + ' · ' + esc(q.source_file) + (q.source_page ? ' · ' + esc(t('page')) + ' ' + esc(q.source_page) : '') + '</p>';
     if (S.ws === 'student' && C.VERIFIED.indexOf(q.verification_status) < 0) h += '<p class="panel warn small">' + esc(vlabel(q.verification_status)) + '</p>';
     if (q.context) h += '<div class="ctx" dir="auto">' + esc(q.context) + '</div>';
     h += '<div class="stem" id="stem" dir="auto">' + esc(C.stemOf(q)) + '</div>';
-    h += '<div role="' + (multi ? 'group' : 'radiogroup') + '" aria-labelledby="stem" class="opts">';
-    it.options.forEach(function (o) {
-      var sel = (a.selected || []).indexOf(o.id) >= 0, isC = (q.correct_option_ids || []).indexOf(o.id) >= 0;
-      var cls = 'opt';
-      var tag = '';
-      if (a.checked) {
-        if (isC) { cls += ' is-correct'; tag = '<strong class="tag">✔ ' + esc(t('correct_answer')) + '</strong>'; }
-        else if (sel) { cls += ' is-wrong'; tag = '<strong class="tag">✖ ' + esc(t('your_answer')) + '</strong>'; }
-      } else if (sel) cls += ' is-sel';
-      h += '<label class="' + cls + '"><input type="' + (multi ? 'checkbox' : 'radio') + '" name="opt" value="' + esc(o.id) + '"' + (sel ? ' checked' : '') + (a.checked ? ' disabled' : '') + ' data-change="pick">' +
-        '<span class="ol" aria-hidden="true">' + esc(o.displayLabel) + '</span><span class="ot" dir="auto">' + esc(o.text) + '</span> ' + tag + '</label>';
-    });
-    h += '</div><div id="live" aria-live="polite">';
+    if (written) {
+      h += '<label class="wlabel" for="w_ans">' + esc(t('type_answer')) + '</label><textarea id="w_ans" class="wans" dir="auto" lang="en" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"' + (a.checked ? ' readonly' : '') + '>' + esc(a.text || '') + '</textarea>';
+    } else {
+      h += '<div role="' + (multi ? 'group' : 'radiogroup') + '" aria-labelledby="stem" class="opts">';
+      it.options.forEach(function (o) {
+        var sel = (a.selected || []).indexOf(o.id) >= 0, isC = (q.correct_option_ids || []).indexOf(o.id) >= 0;
+        var cls = 'opt', tag = '';
+        if (a.checked) {
+          if (isC) { cls += ' is-correct'; tag = '<strong class="tag">✔ ' + esc(t('correct_answer')) + '</strong>'; }
+          else if (sel) { cls += ' is-wrong'; tag = '<strong class="tag">✖ ' + esc(t('your_answer')) + '</strong>'; }
+        } else if (sel) cls += ' is-sel';
+        h += '<label class="' + cls + '"><input type="' + (multi ? 'checkbox' : 'radio') + '" name="opt" value="' + esc(o.id) + '"' + (sel ? ' checked' : '') + (a.checked ? ' disabled' : '') + ' data-change="pick">' +
+          '<span class="ol" aria-hidden="true">' + esc(o.displayLabel) + '</span><span class="ot" dir="auto">' + esc(o.text) + '</span> ' + tag + '</label>';
+      });
+      h += '</div>';
+    }
+    h += '<div id="live" aria-live="polite">';
     if (a.checked && immediate) h += feedbackHtml(it, a);
     if (a.revealed && !a.checked) h += '<div class="panel warn"><strong>' + esc(t('answer_revealed')) + ':</strong> <span dir="auto">' + esc(correctText(it)) + '</span></div>';
     h += '</div>';
     var last = qz.idx === qz.items.length - 1;
+    var hasInput = written ? !!(a.text && a.text.trim()) : !!(a.selected && a.selected.length);
     h += '<div class="btns sticky">';
     if (!a.checked) {
-      if (immediate) h += '<button class="btn primary big" data-action="check" ' + ((a.selected && a.selected.length) ? '' : 'disabled') + '>' + esc(t('check')) + '</button>';
+      if (immediate) h += '<button class="btn primary big" data-action="check" ' + (hasInput ? '' : 'disabled') + '>' + esc(t('check')) + '</button>';
       if (bank() && bank().settings && bank().settings.studyMode && immediate) h += '<button class="btn" data-action="reveal">' + esc(t('reveal')) + '</button>';
     }
-    var canNext = a.checked || !immediate || a.revealed;
-    h += '<button class="btn ' + (a.checked ? 'primary big' : '') + '" data-action="next" data-idx="' + qz.idx + '"' + ((canNext || !immediate) ? '' : ' disabled') + '>' + esc(last ? t('finish') : t('next')) + '</button>';
+    var canNext = (a.checked && !a.pending) || !immediate || a.revealed;
+    h += '<button class="btn ' + (a.checked && !a.pending ? 'primary big' : '') + '" data-action="next" data-idx="' + qz.idx + '"' + (canNext ? '' : ' disabled') + '>' + esc(last ? t('finish') : t('next')) + '</button>';
     h += '</div><div class="btns"><button class="btn" data-action="flag" data-id="' + esc(q.id) + '">⚑ ' + esc(t('flag')) + '</button></div></section>';
     return h;
   }
 
   function correctText(it) {
-    var ids = it.question.correct_option_ids || [];
+    var q = it.question;
+    if (isWritten(q)) return (q.accepted_answers || []).join(' / ');
+    var ids = q.correct_option_ids || [];
     return it.options.filter(function (o) { return ids.indexOf(o.id) >= 0; }).map(function (o) { return o.displayLabel + '. ' + o.text; }).join(' / ');
+  }
+  function explHtml(q) {
+    return '<div class="panel expl"><strong>' + esc(t('explanation')) + ':</strong><p dir="auto">' + esc(expFor(q)) + '</p>' +
+      '<p class="small"><strong>' + esc(t('verification')) + ':</strong> ' + esc(vlabel(q.verification_status)) + '</p></div>';
   }
   function feedbackHtml(it, a) {
     var q = it.question, ok = a.correct;
-    return '<div class="panel ' + (ok ? 'good' : 'bad') + '" role="status"><strong class="big">' + (ok ? '✔ ' + esc(t('right')) : '✖ ' + esc(t('incorrect'))) + '</strong>' +
-      (ok ? '' : '<p><strong>' + esc(t('correct_answer')) + ':</strong> <span dir="auto">' + esc(correctText(it)) + '</span></p>') + '</div>' +
-      '<div class="panel expl"><strong>' + esc(t('explanation')) + ':</strong><p dir="auto">' + esc(expFor(q)) + '</p>' +
-      '<p class="small"><strong>' + esc(t('verification')) + ':</strong> ' + esc(vlabel(q.verification_status)) + '</p></div>';
+    if (!isWritten(q)) {
+      return '<div class="panel ' + (ok ? 'good' : 'bad') + '" role="status"><strong class="big">' + (ok ? '✔ ' + esc(t('right')) : '✖ ' + esc(t('incorrect'))) + '</strong>' +
+        (ok ? '' : '<p><strong>' + esc(t('correct_answer')) + ':</strong> <span dir="auto">' + esc(correctText(it)) + '</span></p>') + '</div>' + explHtml(q);
+    }
+    var self = q.grading === 'self';
+    var mine = '<p><strong>' + esc(t('your_answer')) + ':</strong> <span dir="auto">' + esc(a.text) + '</span></p>';
+    var model = '<p><strong>' + esc(t(self ? 'model_answer' : 'correct_answer')) + ':</strong> <span dir="auto">' + esc(correctText(it)) + '</span></p>';
+    if (a.pending) {
+      return '<div class="panel info" role="status"><strong class="big">' + esc(t('compare_answer')) + '</strong>' + mine + model +
+        '<div class="btns"><button class="btn primary" data-action="selfmark" data-v="right">✔ ' + esc(t('i_right')) + '</button><button class="btn" data-action="selfmark" data-v="wrong">✖ ' + esc(t('i_wrong')) + '</button></div></div>' + explHtml(q);
+    }
+    var head = ok ? '✔ ' + esc(t('right')) : '✖ ' + esc(t(self ? 'marked_wrong' : 'no_match'));
+    var extra = a.selfOverride ? '<p class="small">' + esc(t('counted_by_you')) + '</p>' : (a.selfMark ? '<p class="small">' + esc(t('self_assessed')) + '</p>' : '');
+    var btn = (!ok && !self) ? '<div class="btns"><button class="btn" data-action="override">' + esc(t('count_mine')) + '</button></div>' : '';
+    return '<div class="panel ' + (ok ? 'good' : 'bad') + '" role="status"><strong class="big">' + head + '</strong>' + mine + ((ok && !a.selfOverride && !a.selfMark) ? '' : model) + extra + btn + '</div>' + explHtml(q);
   }
   function scoreNow() {
-    var c = 0, n = 0; Object.keys(S.quiz.answers).forEach(function (k) { var a = S.quiz.answers[k]; if (a.checked) { n++; if (a.correct) c++; } }); return c + '/' + n;
+    var c = 0, n = 0; Object.keys(S.quiz.answers).forEach(function (k) { var a = S.quiz.answers[k]; if (a.checked && !a.pending) { n++; if (a.correct) c++; } }); return c + '/' + n;
   }
 
   function resultView() {
     var qz = S.quiz, total = qz.items.length, correct = 0, answered = 0, wrong = [];
     qz.items.forEach(function (it) {
       var a = qz.answers[it.question.id];
-      if (a && (a.checked || a.saved)) { answered++; if (a.correct) correct++; else wrong.push(it); }
+      if (a && (a.checked || a.saved)) { answered++; if (a.correct && !a.pending) correct++; else wrong.push(it); }
       else if (a && a.revealed) { answered++; wrong.push(it); }
     });
     var pct = total ? Math.round(correct / total * 100) : 0;
@@ -346,7 +380,7 @@
       h += '<h3>' + esc(t('review_mistakes')) + '</h3>';
       wrong.concat(unans).forEach(function (it) {
         var q = it.question, a = qz.answers[q.id] || {};
-        var mine = it.options.filter(function (o) { return (a.selected || []).indexOf(o.id) >= 0; }).map(function (o) { return o.displayLabel + '. ' + o.text; }).join(' / ');
+        var mine = isWritten(q) ? (a.text || '') : it.options.filter(function (o) { return (a.selected || []).indexOf(o.id) >= 0; }).map(function (o) { return o.displayLabel + '. ' + o.text; }).join(' / ');
         h += '<article class="card q"><div class="stem" dir="auto">' + esc(C.stemOf(q)) + '</div>' +
           '<p><strong>' + esc(t('your_answer')) + ':</strong> <span dir="auto">' + esc(mine || t('unanswered')) + '</span></p>' +
           '<div class="panel good"><strong>✔ ' + esc(t('correct_answer')) + ':</strong> <span dir="auto">' + esc(correctText(it)) + '</span></div>' +
@@ -424,7 +458,9 @@
     var g = function (id) { return document.getElementById(id); };
     q.stem_display = g('f_stem').value; q.context = g('f_ctx').value;
     q.options.forEach(function (o, i) { var el = g('f_opt_' + i); if (el) o.text = el.value; });
-    q.correct_option_ids = Array.prototype.slice.call(document.querySelectorAll('input[name=f_correct]:checked')).map(function (x) { return x.value; });
+    if (g('f_acc')) q.accepted_answers = g('f_acc').value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
+    if (g('f_grading')) q.grading = g('f_grading').value;
+    if (!isWritten(q)) q.correct_option_ids = Array.prototype.slice.call(document.querySelectorAll('input[name=f_correct]:checked')).map(function (x) { return x.value; });
     q.explanation_en = g('f_en') ? g('f_en').value : q.explanation_en; q.explanation_ar = g('f_ar') ? g('f_ar').value : q.explanation_ar;
     q.verification_status = g('f_vs') ? g('f_vs').value : q.verification_status;
     if (g('f_evt')) q.evidence = readEvidence();
@@ -450,7 +486,7 @@
 
   function saveEdit(id) {
     var q = qById(id), d = S.draft;
-    var snap = function (x) { return JSON.stringify([x.stem_display, x.context, x.options, x.correct_option_ids, x.explanation_en, x.explanation_ar, x.verification_status]); };
+    var snap = function (x) { return JSON.stringify([x.stem_display, x.context, x.options, x.accepted_answers, x.grading, x.correct_option_ids, x.explanation_en, x.explanation_ar, x.verification_status]); };
     var before = snap(q);
     applyForm(d);
     if (C.VERIFIED.indexOf(d.verification_status) >= 0 && !d.evidence.length) { flash('error', t('need_evidence')); return render(); }
@@ -476,12 +512,13 @@
     }
     render();
   }
-  function addManual() {
+  function addManual(kind) {
     var b = bank(); if (!b) return;
+    var sa = kind === 'sa';
     var q = {
-      id: C.uid('q'), bank_id: b.id, source_file: 'manual entry', source_page: null, source_question_number: String(bankQs().length + 1),
-      language: 'en', question_type: 'single_choice', stem_original: '', stem_display: '', context: '',
-      options: ['A', 'B', 'C', 'D'].map(function (l) { return { id: l, label: l, text: '' }; }), correct_option_ids: [],
+      id: C.uid('q'), order: maxOrder(b.id) + 1, bank_id: b.id, source_file: 'manual entry', source_page: null, source_question_number: String(bankQs().length + 1),
+      language: 'en', question_type: sa ? 'short_answer' : 'single_choice', stem_original: '', stem_display: '', context: '',
+      options: sa ? [] : ['A', 'B', 'C', 'D'].map(function (l) { return { id: l, label: l, text: '' }; }), correct_option_ids: [], accepted_answers: [], grading: 'auto',
       explanation_en: '', explanation_ar: '', distractor_explanations: {}, verification_status: 'needs_review', estimated_confidence: null,
       confidence_basis: '', evidence: [], ambiguity_notes: '', ocr_notes: '', review_status: 'draft', approved_for_practice: false,
       approved_for_formal_test: false, reviewer_decision: null, reviewer_date: null, created_at: now(), updated_at: now(), _new: true
@@ -570,7 +607,8 @@
     }
     if (!target) { a.notice = { type: 'warn', text: t('no_target') }; return render(); }
     var qs = p.questions;
-    qs.forEach(function (q) { q.bank_id = target.id; });
+    var baseOrder = newBank ? 0 : maxOrder(target.id);
+    qs.forEach(function (q, qi) { q.bank_id = target.id; q.order = baseOrder + (typeof q.order === 'number' ? q.order : qi + 1); });
     var existing = newBank ? [] : S.questions.filter(function (q) { return q.bank_id === target.id; });
     var dups = C.findDuplicates(existing, qs);
     qs.forEach(function (q) { if (dups[q.id]) { q.duplicate_of = dups[q.id]; q.ambiguity_notes = (q.ambiguity_notes ? q.ambiguity_notes + ' | ' : '') + 'Possible duplicate of ' + dups[q.id] + ' (not merged).'; } });
@@ -605,9 +643,16 @@
   }
 
   function quizCheck() {
-    var qz = S.quiz, it = qz.items[qz.idx], a = qz.answers[it.question.id];
-    if (!a || !a.selected || !a.selected.length || a.checked) return;
-    a.checked = true; a.correct = C.isCorrect(it.question, a.selected);
+    var qz = S.quiz, it = qz.items[qz.idx], q = it.question, a = qz.answers[q.id];
+    if (!a || a.checked) return;
+    if (isWritten(q)) {
+      if (!a.text || !a.text.trim()) return;
+      a.checked = true;
+      if (q.grading === 'self') { a.pending = true; a.correct = false; } else a.correct = C.gradeWritten(q, a.text);
+      return;
+    }
+    if (!a.selected || !a.selected.length) return;
+    a.checked = true; a.correct = C.isCorrect(q, a.selected);
   }
 
   /* ---------- events ---------- */
@@ -637,7 +682,7 @@
     if (act === 'edit') { S.editingId = id; S.draft = JSON.parse(JSON.stringify(qById(id))); render(); window.scrollTo(0, 0); return; }
     if (act === 'cancel-edit') return cancelEdit();
     if (act === 'save-edit') return saveEdit(id);
-    if (act === 'add-manual') return addManual();
+    if (act === 'add-manual') return addManual(v);
     if (act === 'approve-all') return approveAll();
     if (act === 'add-option' || act === 'remove-option') {
       applyForm(S.draft);
@@ -672,12 +717,18 @@
       startQuiz(el2, S.quizSetup); return render();
     }
     if (act === 'check') { quizCheck(); return renderKeepScroll(); }
+    if (act === 'selfmark') { var sa = S.quiz.answers[S.quiz.items[S.quiz.idx].question.id]; if (sa && sa.pending) { sa.pending = false; sa.correct = v === 'right'; sa.selfMark = v; } return renderKeepScroll(); }
+    if (act === 'override') { var oa = S.quiz.answers[S.quiz.items[S.quiz.idx].question.id]; if (oa && oa.checked && !oa.correct) { oa.correct = true; oa.selfOverride = true; } return renderKeepScroll(); }
     if (act === 'reveal') { var it0 = S.quiz.items[S.quiz.idx]; var a0 = S.quiz.answers[it0.question.id] || (S.quiz.answers[it0.question.id] = {}); a0.revealed = true; a0.correct = false; return renderKeepScroll(); }
     if (act === 'next') {
       var qz = S.quiz; if (!qz || +el.dataset.idx !== qz.idx) return; // advance exactly once per question
       var cur = qz.items[qz.idx], a1 = qz.answers[cur.question.id];
-      if (qz.setup.feedback === 'end' && a1 && a1.selected && a1.selected.length) { a1.saved = true; a1.correct = C.isCorrect(cur.question, a1.selected); }
-      if (qz.setup.feedback === 'immediate' && !(a1 && (a1.checked || a1.revealed))) return;
+      var imm = isImm(qz, cur.question);
+      if (!imm && a1) {
+        if (isWritten(cur.question)) { if (a1.text && a1.text.trim()) { a1.saved = true; a1.correct = C.gradeWritten(cur.question, a1.text); } }
+        else if (a1.selected && a1.selected.length) { a1.saved = true; a1.correct = C.isCorrect(cur.question, a1.selected); }
+      }
+      if (imm && !(a1 && ((a1.checked && !a1.pending) || a1.revealed))) return;
       if (qz.idx >= qz.items.length - 1) finishQuiz(); else qz.idx++;
       render(); window.scrollTo(0, 0); var s = document.getElementById('stem'); if (s) { s.setAttribute('tabindex', '-1'); s.focus(); } return;
     }
@@ -698,6 +749,11 @@
     if (el.id === 'aFile') { readAddFields(); if (el.files && el.files[0]) handleAddFile(el.files[0]); return; }
     var k = el.dataset && el.dataset.change; if (!k) return;
     if (k === 'bank') { S.bankId = el.value; S.editingId = null; S.quiz = null; return render(); }
+    if (k === 'qtype' && S.draft) {
+      applyForm(S.draft); S.draft.question_type = el.value;
+      if (el.value === 'single_choice' && !S.draft.options.length) S.draft.options = ['A', 'B', 'C', 'D'].map(function (l) { return { id: l, label: l, text: '' }; });
+      return renderKeepScroll();
+    }
     if (k === 'filter') { S.filter = el.value; return render(); }
     if (k === 'a-target') { readAddFields(); return render(); }
     if (k === 'qs-mode') { readSetup(); return render(); }
@@ -713,6 +769,11 @@
 
   document.addEventListener('input', function (e) {
     var id = e.target.id;
+    if (id === 'w_ans' && S.quiz && !S.quiz.done) {
+      var wq = S.quiz.items[S.quiz.idx].question, wa = S.quiz.answers[wq.id] || (S.quiz.answers[wq.id] = {});
+      if (!wa.checked) { wa.text = e.target.value; var cb = document.querySelector('[data-action=check]'); if (cb) cb.disabled = !wa.text.trim(); }
+      return;
+    }
     if (id === 'a_text') S.add.text = e.target.value; else if (id === 'a_source') S.add.source = e.target.value; else if (id === 'a_new') S.add.newName = e.target.value;
   });
 

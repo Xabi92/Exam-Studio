@@ -26,7 +26,11 @@
     if (!nonEmpty(stemOf(q))) r.push('EMPTY_STEM: the question text is empty');
     var opts = Array.isArray(q.options) ? q.options : [];
     var type = q.question_type || 'single_choice';
-    if (type !== 'single_choice' && type !== 'multiple_select') r.push('UNSUPPORTED_TYPE: written-answer questions are kept for the teacher but cannot be used in student quizzes yet');
+    if (type !== 'single_choice' && type !== 'multiple_select' && type !== 'short_answer') r.push('UNSUPPORTED_TYPE: question type "' + type + '" is not supported in student quizzes');
+    if (type === 'short_answer') {
+      var acc = (Array.isArray(q.accepted_answers) ? q.accepted_answers : []).filter(nonEmpty);
+      if (!acc.length) r.push('NO_ACCEPTED_ANSWER: no model/accepted answer is recorded');
+    }
     if (type === 'single_choice' || type === 'multiple_select') {
       if (opts.length < 2) r.push('OPTIONS_MISSING: fewer than 2 answer choices');
       var seen = {};
@@ -94,6 +98,17 @@
     return a.length > 0 && a === b;
   }
 
+  /** Normalisation for typed answers: case, curly quotes, punctuation and spacing are ignored. */
+  function normAnswer(s) {
+    return str(s).toLowerCase().replace(/[\u2018\u2019\u02BC`\u00B4]/g, "'").replace(/[\u064B-\u065F\u0670]/g, '')
+      .replace(/[^\p{L}\p{N}' ]+/gu, ' ').replace(/\s+/g, ' ').trim();
+  }
+  /** true if the typed text equals any accepted answer after normalisation. Never used for self-graded questions. */
+  function gradeWritten(q, text) {
+    var t = normAnswer(text); if (!t) return false;
+    return (q.accepted_answers || []).some(function (a) { return nonEmpty(a) && normAnswer(a) === t; });
+  }
+
   function normalizeText(s) {
     return str(s).toLowerCase().replace(/[\u064B-\u065F\u0670]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
   }
@@ -137,7 +152,9 @@
     if (opt.mode === 'append') {
       var target = existing.banks.filter(function (b) { return b.id === opt.targetBankId; })[0];
       if (!target) return { ok: false, errors: ['Target bank not found.'] };
-      qs.forEach(function (q) {
+      var baseOrder = 0; existing.questions.forEach(function (q) { if (q.bank_id === target.id && typeof q.order === 'number') baseOrder = Math.max(baseOrder, q.order); });
+      qs.forEach(function (q, qi) {
+        q.order = baseOrder + (typeof q.order === 'number' ? q.order : qi + 1);
         if (existingQIds[q.id]) { q.id = uid('q'); rekeyed = true; }
         q.bank_id = target.id; q.review_status = 'needs_review'; q.approved_for_practice = false; q.approved_for_formal_test = false;
       });
@@ -196,7 +213,7 @@
 
 
   /* ---------- Text format (what an AI or a person produces from files the app cannot read) ---------- */
-  var TEXT_KEYS = ['BANK', 'SOURCE', 'Q', 'PAGE', 'LANG', 'TYPE', 'STEM', 'CONTEXT', 'ANSWER', 'EXPLANATION', 'EXPLANATION_EN', 'EXPLANATION_AR', 'STATUS', 'EVIDENCE', 'AMBIGUITY', 'OCR', 'CONFIDENCE_BASIS'];
+  var TEXT_KEYS = ['ALT', 'GRADING', 'BANK', 'SOURCE', 'Q', 'PAGE', 'LANG', 'TYPE', 'STEM', 'CONTEXT', 'ANSWER', 'EXPLANATION', 'EXPLANATION_EN', 'EXPLANATION_AR', 'STATUS', 'EVIDENCE', 'AMBIGUITY', 'OCR', 'CONFIDENCE_BASIS'];
 
   var AI_PROMPT = [
     'You are preparing exam questions for import into Exam Studio. Convert the attached file (PDF, scan, DOCX or image) into PLAIN TEXT in EXACTLY this format, one block per question, separated by a line of three dashes.',
@@ -222,6 +239,13 @@
     'OCR: <any word you could not read with certainty>',
     '---',
     '',
+    'WRITTEN-ANSWER QUESTIONS (sentence transformation, correct the verb in brackets, correct the mistake, type the missing word) use this block instead of A) B) C) D):',
+    'TYPE: short_answer',
+    'STEM: <the sentence and/or instruction exactly as printed>',
+    'ANSWER: <the model answer as TEXT, not a letter>',
+    'ALT: <another accepted answer, optional; repeat the ALT line for each one>',
+    'GRADING: auto | self   (auto = typed text is compared with the answers; self = the student compares with the model answer, use this for free sentences)',
+    '',
     'RULES (important):',
     '1. Never invent missing question text, options, page numbers or sources. If something is unreadable write [unclear] in its place and use STATUS: unreadable_incomplete.',
     '2. Keep the source wording exactly, including mistakes in the exam itself.',
@@ -240,7 +264,7 @@
     var o = opts || {};
     var lines = String(text || '').replace(/\r/g, '').split('\n');
     var meta = {}, blocks = [], cur = null, field = null, warnings = [];
-    function startBlock(i) { cur = { fields: {}, options: [], evidence: [], line: i + 1 }; blocks.push(cur); field = null; }
+    function startBlock(i) { cur = { fields: {}, options: [], evidence: [], alts: [], line: i + 1 }; blocks.push(cur); field = null; }
     for (var i = 0; i < lines.length; i++) {
       var s = lines[i].trim();
       if (/^(-{3,}|={3,})$/.test(s)) { cur = null; field = null; continue; }
@@ -249,6 +273,7 @@
       if (m && TEXT_KEYS.indexOf(key) >= 0) {
         if (blocks.length === 0 && !cur && (key === 'BANK' || key === 'SOURCE' || key === 'LANG')) { meta[key] = m[2].trim(); field = null; continue; }
         if (key === 'Q' || !cur) startBlock(i);
+        if (key === 'ALT') { cur.alts.push(m[2].trim()); field = null; continue; }
         if (key === 'EVIDENCE') { cur.evidence.push(m[2].trim()); field = null; continue; }
         cur.fields[key] = m[2].trim(); field = { key: key }; continue;
       }
@@ -268,19 +293,22 @@
       var num = f.Q || String(idx + 1);
       var stem = f.STEM || '';
       var opts = b.options.map(function (x) { return { id: x.id, label: x.id, text: x.text }; });
-      var ans = (f.ANSWER || '').toUpperCase().split(/[^A-J]+/).filter(Boolean);
+      var qtype = (f.TYPE || 'single_choice').toLowerCase();
+      var written = qtype === 'short_answer';
+      var ans = written ? [] : (f.ANSWER || '').toUpperCase().split(/[^A-J]+/).filter(Boolean);
+      var accepted = written ? [f.ANSWER || ''].concat(b.alts).map(function (x) { return String(x).trim(); }).filter(Boolean) : [];
       var st = (f.STATUS || '').trim().toLowerCase();
       var ev = b.evidence.map(function (e) { var p = e.split('|').map(function (x) { return x.trim(); }); return { title: p[0] || '', url: p[1] || '', accessed: p[2] || '', supports: p[3] || '' }; }).filter(function (e) { return e.title || e.url; });
       if (!VERIFICATION[st]) { if (st) notes.push('Unknown STATUS "' + st + '" replaced by needs_review.'); st = 'needs_review'; }
       if (VERIFIED.indexOf(st) >= 0 && ev.length === 0) { notes.push('Verified status downgraded to needs_review: no EVIDENCE was given.'); st = 'needs_review'; }
       if (st === 'verified_external' && ev.length && !(ev[0].url && ev[0].accessed)) { notes.push('verified_external downgraded: EVIDENCE lacks URL or access date.'); st = 'needs_review'; }
-      if (st === 'independently_solved_high' && ans.length === 0) { notes.push('No ANSWER given; status set to needs_review.'); st = 'needs_review'; }
+      if (st === 'independently_solved_high' && ans.length === 0 && accepted.length === 0) { notes.push('No ANSWER given; status set to needs_review.'); st = 'needs_review'; }
       var lang = (f.LANG || meta.LANG || '').toLowerCase(); if (['en', 'ar', 'mixed'].indexOf(lang) < 0) lang = detectLang(stem);
       var gen = f.EXPLANATION || '';
       var q = {
         id: uid('q'), bank_id: o.bankId || null, source_file: o.sourceFile || meta.SOURCE || 'pasted text',
         source_page: f.PAGE ? (isNaN(parseInt(f.PAGE, 10)) ? f.PAGE : parseInt(f.PAGE, 10)) : null, source_question_number: num,
-        language: lang, question_type: (f.TYPE || 'single_choice').toLowerCase(),
+        order: idx + 1, language: lang, question_type: qtype, accepted_answers: accepted, grading: (f.GRADING || '').toLowerCase() === 'self' ? 'self' : 'auto',
         stem_original: stem, stem_display: stem, context: f.CONTEXT || '', options: opts, correct_option_ids: ans,
         explanation_en: f.EXPLANATION_EN || (lang !== 'ar' ? gen : ''), explanation_ar: f.EXPLANATION_AR || (lang === 'ar' ? gen : ''),
         distractor_explanations: {}, verification_status: st, estimated_confidence: null,
@@ -291,7 +319,7 @@
       };
       var probs = validateQuestion(q);
       if (!stem.trim()) warnings.push('Question ' + num + ' (line ' + b.line + '): empty stem; it will be blocked.');
-      if (opts.length < 2) warnings.push('Question ' + num + ' (line ' + b.line + '): fewer than 2 options; it will be blocked.');
+      if (!written && opts.length < 2) warnings.push('Question ' + num + ' (line ' + b.line + '): fewer than 2 options; it will be blocked.');
       questions.push(q);
       q._problems = probs;
     });
@@ -325,28 +353,26 @@
     var questions = data.qs.map(function (r, idx) {
       var isMc = (r.type || 'mcq') === 'mcq' && Array.isArray(r.o);
       var opts = isMc ? r.o.map(function (x, i) { return { id: L[i], label: L[i], text: String(x) }; }) : [];
-      var ans = [], notes = [];
+      var ans = [], notes = [], accepted = [];
       if (isMc) {
         if (Number.isInteger(r.a) && r.a >= 0 && r.a < opts.length) ans = [opts[r.a].id];
         else notes.push('The answer is missing or out of range in the source file.');
       } else {
-        notes.push('Written-answer question (type "' + (r.type || '?') + '"). Kept for the teacher; not supported in student quizzes yet.');
+        [r.ans].concat(r.alts || []).forEach(function (x) { x = String(x === undefined || x === null ? '' : x).trim(); if (x && accepted.indexOf(x) < 0) accepted.push(x); });
+        if (!accepted.length) notes.push('No model answer in the source file.');
       }
       var probable = r.t && r.t !== 'قطعية';
       if (probable) notes.push('Marked "' + r.t + '" (probable, not definitive) in the source file.');
       if (/تم تصحيح|تصحيح الإجابة/.test(r.r || '')) notes.push('The source file says this answer was corrected after an earlier mistake.');
-      var st = (isMc && ans.length && !probable) ? 'independently_solved_high' : 'needs_review';
+      var st = ((isMc ? ans.length : accepted.length) && !probable) ? 'independently_solved_high' : 'needs_review';
       var stem = String(r.q || '');
       var exAr = String(r.r || ''), exEn = '';
-      if (!isMc) {
-        var alts = (r.alts || []).filter(function (a) { return a !== r.ans; });
-        exEn = 'Model answer: ' + (r.ans || '') + (alts.length ? ' (also accepted: ' + alts.join(' / ') + ')' : '');
-      }
+      if (!exAr.trim() && accepted.length) exEn = 'Model answer: ' + accepted.join(' / ');
       var key = (o.idPrefix || 'qz') + '-' + (r.sec || 's') + '-' + String(r.n).padStart(3, '0');
       if (used[key]) key += '-' + (idx + 1); used[key] = true;
       return {
-        id: o.idPrefix ? key : uid('q'), bank_id: o.bankId || null, source_file: file, source_page: null, source_question_number: String(r.n),
-        category: secs[r.sec] || r.sec || '', language: detectLang(stem), question_type: isMc ? 'single_choice' : 'short_answer',
+        id: o.idPrefix ? key : uid('q'), order: idx + 1, bank_id: o.bankId || null, source_file: file, source_page: null, source_question_number: String(r.n),
+        category: secs[r.sec] || r.sec || '', language: detectLang(stem), question_type: isMc ? 'single_choice' : 'short_answer', accepted_answers: accepted, grading: r.type === 'self' ? 'self' : 'auto',
         stem_original: stem, stem_display: stem, context: String(r.ins || ''), options: opts, correct_option_ids: ans,
         explanation_en: exEn, explanation_ar: exAr, distractor_explanations: {}, verification_status: st, estimated_confidence: null,
         confidence_basis: st === 'independently_solved_high' ? 'Marked "قطعية" (definitive) in the earlier quiz file "' + file + '". No official key or source is recorded in that file, so this is NOT counted as verified.' : '',
@@ -356,12 +382,12 @@
     });
     if (data.exclnote) warnings.push(data.exclnote);
     var nonMc = questions.filter(function (q) { return q.question_type !== 'single_choice'; }).length;
-    if (nonMc) warnings.push(nonMc + ' written-answer questions were imported as blocked items (student quizzes support multiple-choice only).');
+    if (nonMc) warnings.push(nonMc + ' written-answer questions (typed answers) are included.');
     return { ok: true, meta: { BANK: data.title || file, SOURCE: file, DESCRIPTION: [data.sub, data.exclnote].filter(Boolean).join(' — ') }, questions: questions, warnings: warnings };
   }
 
   return {
-    parseQuizHtml: parseQuizHtml, extractDataObject: extractDataObject, TEXT_KEYS: TEXT_KEYS, AI_PROMPT: AI_PROMPT, parseTextBank: parseTextBank, detectLang: detectLang,
+    normAnswer: normAnswer, gradeWritten: gradeWritten, parseQuizHtml: parseQuizHtml, extractDataObject: extractDataObject, TEXT_KEYS: TEXT_KEYS, AI_PROMPT: AI_PROMPT, parseTextBank: parseTextBank, detectLang: detectLang,
     VERIFICATION: VERIFICATION, VERIFIED: VERIFIED, REVIEW_STATUSES: REVIEW_STATUSES,
     stemOf: stemOf, validateQuestion: validateQuestion, eligibility: eligibility, eligibleQuestions: eligibleQuestions,
     shuffle: shuffle, presentQuestion: presentQuestion, isCorrect: isCorrect, fingerprint: fingerprint, findDuplicates: findDuplicates,
