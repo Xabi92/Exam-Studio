@@ -26,6 +26,7 @@
     if (!nonEmpty(stemOf(q))) r.push('EMPTY_STEM: the question text is empty');
     var opts = Array.isArray(q.options) ? q.options : [];
     var type = q.question_type || 'single_choice';
+    if (type !== 'single_choice' && type !== 'multiple_select') r.push('UNSUPPORTED_TYPE: written-answer questions are kept for the teacher but cannot be used in student quizzes yet');
     if (type === 'single_choice' || type === 'multiple_select') {
       if (opts.length < 2) r.push('OPTIONS_MISSING: fewer than 2 answer choices');
       var seen = {};
@@ -298,8 +299,69 @@
     return { meta: meta, questions: questions, warnings: warnings };
   }
 
+  /* ---------- Import of quiz HTML files made earlier (a page containing: const DATA = {...}) ---------- */
+  function extractDataObject(text) {
+    var m = /const\s+DATA\s*=\s*/.exec(text); if (!m) return null;
+    var i = m.index + m[0].length; if (text[i] !== '{') return null;
+    var depth = 0, inStr = false, esc = false;
+    for (var j = i; j < text.length; j++) {
+      var c = text[j];
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true; else if (c === '{') depth++; else if (c === '}') { depth--; if (depth === 0) return text.slice(i, j + 1); }
+    }
+    return null;
+  }
+
+  /** Safe: only JSON.parse on the data block, nothing from the page is executed. */
+  function parseQuizHtml(text, o) {
+    o = o || {};
+    var fail = function (msg) { return { ok: false, meta: {}, questions: [], warnings: [msg] }; };
+    var raw = extractDataObject(String(text || ''));
+    if (!raw) return fail('No quiz data found in this HTML file (expected a block like: const DATA = {...}).');
+    var data; try { data = JSON.parse(raw); } catch (e) { return fail('The quiz data could not be read: ' + e.message); }
+    if (!data || !Array.isArray(data.qs)) return fail('The quiz data has no question list.');
+    var file = o.sourceFile || 'quiz.html', warnings = [], t0 = new Date().toISOString(), L = 'ABCDEFGHIJ', used = {};
+    var secs = {}; (data.secs || []).forEach(function (s) { secs[s.k] = s.label; });
+    var questions = data.qs.map(function (r, idx) {
+      var isMc = (r.type || 'mcq') === 'mcq' && Array.isArray(r.o);
+      var opts = isMc ? r.o.map(function (x, i) { return { id: L[i], label: L[i], text: String(x) }; }) : [];
+      var ans = [], notes = [];
+      if (isMc) {
+        if (Number.isInteger(r.a) && r.a >= 0 && r.a < opts.length) ans = [opts[r.a].id];
+        else notes.push('The answer is missing or out of range in the source file.');
+      } else {
+        notes.push('Written-answer question (type "' + (r.type || '?') + '"). Kept for the teacher; not supported in student quizzes yet.');
+      }
+      var probable = r.t && r.t !== 'قطعية';
+      if (probable) notes.push('Marked "' + r.t + '" (probable, not definitive) in the source file.');
+      if (/تم تصحيح|تصحيح الإجابة/.test(r.r || '')) notes.push('The source file says this answer was corrected after an earlier mistake.');
+      var st = (isMc && ans.length && !probable) ? 'independently_solved_high' : 'needs_review';
+      var stem = String(r.q || '');
+      var exAr = String(r.r || ''), exEn = '';
+      if (!isMc) {
+        var alts = (r.alts || []).filter(function (a) { return a !== r.ans; });
+        exEn = 'Model answer: ' + (r.ans || '') + (alts.length ? ' (also accepted: ' + alts.join(' / ') + ')' : '');
+      }
+      var key = (o.idPrefix || 'qz') + '-' + (r.sec || 's') + '-' + String(r.n).padStart(3, '0');
+      if (used[key]) key += '-' + (idx + 1); used[key] = true;
+      return {
+        id: o.idPrefix ? key : uid('q'), bank_id: o.bankId || null, source_file: file, source_page: null, source_question_number: String(r.n),
+        category: secs[r.sec] || r.sec || '', language: detectLang(stem), question_type: isMc ? 'single_choice' : 'short_answer',
+        stem_original: stem, stem_display: stem, context: String(r.ins || ''), options: opts, correct_option_ids: ans,
+        explanation_en: exEn, explanation_ar: exAr, distractor_explanations: {}, verification_status: st, estimated_confidence: null,
+        confidence_basis: st === 'independently_solved_high' ? 'Marked "قطعية" (definitive) in the earlier quiz file "' + file + '". No official key or source is recorded in that file, so this is NOT counted as verified.' : '',
+        evidence: [], ambiguity_notes: notes.join(' | '), ocr_notes: '', review_status: 'needs_review', approved_for_practice: false,
+        approved_for_formal_test: false, reviewer_decision: null, reviewer_date: null, created_at: t0, updated_at: t0
+      };
+    });
+    if (data.exclnote) warnings.push(data.exclnote);
+    var nonMc = questions.filter(function (q) { return q.question_type !== 'single_choice'; }).length;
+    if (nonMc) warnings.push(nonMc + ' written-answer questions were imported as blocked items (student quizzes support multiple-choice only).');
+    return { ok: true, meta: { BANK: data.title || file, SOURCE: file, DESCRIPTION: [data.sub, data.exclnote].filter(Boolean).join(' — ') }, questions: questions, warnings: warnings };
+  }
+
   return {
-    TEXT_KEYS: TEXT_KEYS, AI_PROMPT: AI_PROMPT, parseTextBank: parseTextBank, detectLang: detectLang,
+    parseQuizHtml: parseQuizHtml, extractDataObject: extractDataObject, TEXT_KEYS: TEXT_KEYS, AI_PROMPT: AI_PROMPT, parseTextBank: parseTextBank, detectLang: detectLang,
     VERIFICATION: VERIFICATION, VERIFIED: VERIFIED, REVIEW_STATUSES: REVIEW_STATUSES,
     stemOf: stemOf, validateQuestion: validateQuestion, eligibility: eligibility, eligibleQuestions: eligibleQuestions,
     shuffle: shuffle, presentQuestion: presentQuestion, isCorrect: isCorrect, fingerprint: fingerprint, findDuplicates: findDuplicates,

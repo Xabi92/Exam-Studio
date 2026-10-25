@@ -137,7 +137,7 @@
   function cardHtml(q) {
     var problems = C.validateQuestion(q);
     var el = C.eligibility(q, 'practice', bank().settings);
-    var h = '<article class="card q" id="card-' + esc(q.id) + '"><header class="qh"><strong>' + esc(t('qno')) + ' ' + esc(q.source_question_number) + '</strong> <span class="muted">' + esc(t('page')) + ' ' + esc(q.source_page) + ' · ' + esc(q.language) + '</span></header>';
+    var h = '<article class="card q" id="card-' + esc(q.id) + '"><header class="qh"><strong>' + esc(t('qno')) + ' ' + esc(q.source_question_number) + '</strong> <span class="muted">' + (q.source_page ? esc(t('page')) + ' ' + esc(q.source_page) + ' · ' : '') + esc(q.language) + (q.category ? ' · ' + esc(q.category) : '') + '</span></header>';
     h += '<div class="badges">' + badge(q.verification_status) +
       '<span class="badge rv-' + esc(q.review_status) + '">' + esc(t('rv_' + q.review_status)) + '</span>' +
       (q.flagged ? '<span class="badge st-needs_review">⚑ ' + esc(t('flagged')) + '</span>' : '') +
@@ -282,7 +282,7 @@
       (qz.deadline ? '<span class="timer" aria-label="' + esc(t('time_left')) + '">⏱ <span id="timer"></span></span>' : '') + '</div>' +
       '<div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="' + qz.items.length + '" aria-valuenow="' + (qz.idx + 1) + '"><div class="bar" style="width:' + Math.round((qz.idx + (a.checked ? 1 : 0)) / qz.items.length * 100) + '%"></div></div>' +
       '<p class="prog">' + esc(t('progress', { i: qz.idx + 1, n: qz.items.length })) + (immediate ? ' · ' + esc(t('score')) + ': ' + scoreNow() : '') + '</p>' +
-      '<p class="muted small">' + esc(t('qno')) + ' ' + esc(q.source_question_number) + ' · ' + esc(q.source_file) + ' · ' + esc(t('page')) + ' ' + esc(q.source_page) + '</p>';
+      '<p class="muted small">' + esc(t('qno')) + ' ' + esc(q.source_question_number) + (q.category ? ' · ' + esc(q.category) : '') + ' · ' + esc(q.source_file) + (q.source_page ? ' · ' + esc(t('page')) + ' ' + esc(q.source_page) : '') + '</p>';
     if (S.ws === 'student' && C.VERIFIED.indexOf(q.verification_status) < 0) h += '<p class="panel warn small">' + esc(vlabel(q.verification_status)) + '</p>';
     if (q.context) h += '<div class="ctx" dir="auto">' + esc(q.context) + '</div>';
     h += '<div class="stem" id="stem" dir="auto">' + esc(C.stemOf(q)) + '</div>';
@@ -495,7 +495,7 @@
     var a = S.add, b = bank();
     var h = '<section class="card"><h2>' + esc(t('add_title')) + '</h2><p>' + esc(t('add_intro')) + '</p>' +
       '<ul class="small"><li>' + esc(t('add_way1')) + '</li><li>' + esc(t('add_way2')) + '</li><li>' + esc(t('add_way3')) + '</li></ul>' +
-      '<label>' + esc(t('add_file')) + '<input type="file" id="aFile" accept=".txt,.md,.text,.json,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"></label>';
+      '<label>' + esc(t('add_file')) + '<input type="file" id="aFile" accept=".txt,.md,.text,.json,.html,.htm,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"></label>';
     if (a.notice) h += '<div class="panel ' + (a.notice.type === 'warn' ? 'warn' : 'info') + '" role="status">' + esc(a.notice.text) + '</div>';
     h += '<details class="panel info small"><summary><strong>' + esc(t('ai_prompt_title')) + '</strong></summary><p>' + esc(t('ai_prompt_help')) + '</p>' +
       '<textarea id="aiPrompt" readonly dir="ltr" rows="8">' + esc(C.AI_PROMPT) + '</textarea>' +
@@ -534,6 +534,16 @@
       r.onload = function () { S.add.text = String(r.result); S.add.notice = { type: 'info', text: t('file_loaded', { name: name }) }; render(); };
       r.readAsText(file, 'utf-8'); return;
     }
+    if (ext === 'html' || ext === 'htm') {
+      var hr = new FileReader();
+      hr.onload = function () {
+        var res = C.parseQuizHtml(String(hr.result), { sourceFile: name, bankId: '__new__' });
+        if (!res.ok) { S.add.notice = { type: 'warn', text: res.warnings.join(' ') }; S.add.preview = null; return render(); }
+        S.add.target = 'new'; S.add.newName = res.meta.BANK; S.add.text = ''; S.add.preview = res;
+        S.add.notice = { type: 'info', text: t('html_loaded', { name: name }) }; render();
+      };
+      hr.readAsText(file, 'utf-8'); return;
+    }
     if (ext === 'json') { S.add.notice = { type: 'info', text: t('json_routed') }; doImport(file, S.add.target === 'new' ? 'new' : (bank() ? 'append' : 'new')); return; }
     // PDF / DOCX / images: this app has no OCR/PDF engine. Record the attempt, tell the teacher what to do.
     var rec = { id: C.uid('import'), source_file: name, imported_at: now(), method: 'File selected; not readable by the app. Awaiting AI-converted text file.', notes: 'No questions were created from this file.', bank_id: S.bankId };
@@ -555,7 +565,7 @@
     var target = bank(), newBank = null;
     if (a.target === 'new') {
       var nm = (a.newName || '').trim() || p.meta.BANK || ('Bank ' + new Date().toISOString().slice(0, 10));
-      newBank = { id: C.uid('bank'), name: nm, description: '', created_at: now(), settings: { allowIndependentInPractice: false, studyMode: false } };
+      newBank = { id: C.uid('bank'), name: nm, description: p.meta.DESCRIPTION || '', created_at: now(), settings: { allowIndependentInPractice: false, studyMode: false } };
       target = newBank;
     }
     if (!target) { a.notice = { type: 'warn', text: t('no_target') }; return render(); }
